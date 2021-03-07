@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * LEDs driver for GPIOs
+ * LEDs control driver for similar use as it would be a GPIO
  *
  * Copyright (C) Stefan Eichenberger <stefan@embear.ch>
  */
