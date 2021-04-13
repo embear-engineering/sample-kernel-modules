@@ -8,6 +8,7 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/seq_file.h>
+#include <linux/watchdog.h>
 
 /* Reset reasons */
 #define POWEROFF_PATTERN			(0x0)
@@ -20,9 +21,6 @@
  * Else you should uncomment ENABLE_WATCHDOG
  */
 #define ENABLE_WATCHDOG
-#ifdef ENABLE_WATCHDOG
-extern struct atomic_notifier_head watchdog_notifier_list;
-#endif
 
 struct reset_reason_platform_data *pdata;
 
@@ -179,7 +177,7 @@ static int reset_reason_probe(struct platform_device *pdev)
 	/* Make sure you patch the kernel with the pertimeout_notifier governor,
 	 * else this will not work
 	 */
-	atomic_notifier_chain_register(&watchdog_notifier_list, &watchdog_notify_block);
+	register_watchdog_pretimeout_notifier(&watchdog_notify_block);
 #endif
 
 	read_reset_reg(pdata);
@@ -208,7 +206,7 @@ static int reset_reason_remove(struct platform_device *pdev)
 	unregister_reboot_notifier(&reboot_notify_block);
 	atomic_notifier_chain_unregister(&panic_notifier_list, &panic_notify_block);
 #ifdef ENABLE_WATCHDOG
-	atomic_notifier_chain_unregister(&watchdog_notifier_list, &watchdog_notify_block);
+	unregister_watchdog_pretimeout_notifier(&watchdog_notify_block);
 #endif
 
 	iounmap(pdata->regs);
