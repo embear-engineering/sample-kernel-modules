@@ -1,0 +1,131 @@
+From 0af4dfbd99bcd5488addc5d43dc07ac64e4b07e2 Mon Sep 17 00:00:00 2001
+From: Stefan Eichenberger <eichest@gmail.com>
+Date: Tue, 6 Apr 2021 16:04:05 +0200
+Subject: [PATCH] watchdog: pretimeout: add an atomic notifier governor
+
+Add a governor which calls an atomic notifier call chain. This allows
+one to register a custom function to a watchdog pretimeout.
+
+Signed-off-by: Stefan Eichenberger <eichest@gmail.com>
+---
+ drivers/watchdog/Kconfig               | 16 +++++++++
+ drivers/watchdog/Makefile              |  1 +
+ drivers/watchdog/pretimeout_notifier.c | 46 ++++++++++++++++++++++++++
+ drivers/watchdog/watchdog_pretimeout.h |  2 ++
+ 4 files changed, 65 insertions(+)
+ create mode 100644 drivers/watchdog/pretimeout_notifier.c
+
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index e2745f686196..cbcc911b586a 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -105,6 +105,14 @@ config WATCHDOG_PRETIMEOUT_GOV_PANIC
+ 	  Panic watchdog pretimeout governor, on watchdog pretimeout
+ 	  event put the kernel into panic.
+ 
++config WATCHDOG_PRETIMEOUT_GOV_NOTIFIER
++	tristate "Notifier watchdog pretimeout governor"
++	depends on WATCHDOG_CORE
++	default WATCHDOG_CORE
++	help
++	  Notifier watchdog pretimeout governor, on watchdog pretimeout
++	  event call a notifier list.
++
+ choice
+ 	prompt "Default Watchdog Pretimeout Governor"
+ 	default WATCHDOG_PRETIMEOUT_DEFAULT_GOV_PANIC
+@@ -129,6 +137,14 @@ config WATCHDOG_PRETIMEOUT_DEFAULT_GOV_PANIC
+ 	  a watchdog pretimeout event happens, consider that
+ 	  a watchdog feeder is dead and reboot is unavoidable.
+ 
++config WATCHDOG_PRETIMEOUT_DEFAULT_GOV_NOTIFIER
++	bool "notifier"
++	depends on WATCHDOG_PRETIMEOUT_GOV_NOTIFIER
++	help
++	  Use notifier watchdog pretimeout governor by default,
++	  if a watchdog pretimout event happens, an atomic
++	  notifier call chain is called.
++
+ endchoice
+ 
+ endif # WATCHDOG_PRETIMEOUT_GOV
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 2ee352bf3372..7f3e0e63f57d 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -12,6 +12,7 @@ watchdog-$(CONFIG_WATCHDOG_PRETIMEOUT_GOV)	+= watchdog_pretimeout.o
+ 
+ obj-$(CONFIG_WATCHDOG_PRETIMEOUT_GOV_NOOP)	+= pretimeout_noop.o
+ obj-$(CONFIG_WATCHDOG_PRETIMEOUT_GOV_PANIC)	+= pretimeout_panic.o
++obj-$(CONFIG_WATCHDOG_PRETIMEOUT_GOV_NOTIFIER)	+= pretimeout_notifier.o
+ 
+ # Only one watchdog can succeed. We probe the ISA/PCI/USB based
+ # watchdog-cards first, then the architecture specific watchdog
+diff --git a/drivers/watchdog/pretimeout_notifier.c b/drivers/watchdog/pretimeout_notifier.c
+new file mode 100644
+index 000000000000..53fa67faaf80
+--- /dev/null
++++ b/drivers/watchdog/pretimeout_notifier.c
+@@ -0,0 +1,46 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Copyright (C) 2021 Stefan Eichenberger <stefan@embear.ch>
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/watchdog.h>
++
++#include "watchdog_pretimeout.h"
++
++ATOMIC_NOTIFIER_HEAD(watchdog_notifier_list);
++EXPORT_SYMBOL(watchdog_notifier_list);
++
++/**
++ * pretimeout_notifier - Notify registred methods on pretimeout
++ * @wdd - watchdog_device
++ *
++ * Notify, watchdog has not been fed till pretimeout event.
++ */
++static void pretimeout_notifier(struct watchdog_device *wdd)
++{
++	printk(KERN_ERR "Watchdog pretimeout\n");
++	atomic_notifier_call_chain(&watchdog_notifier_list, 0, wdd);
++}
++
++static struct watchdog_governor watchdog_gov_notifier = {
++	.name		= "notifier",
++	.pretimeout	= pretimeout_notifier,
++};
++
++static int __init watchdog_gov_notifier_register(void)
++{
++	return watchdog_register_governor(&watchdog_gov_notifier);
++}
++
++static void __exit watchdog_gov_notifier_unregister(void)
++{
++	watchdog_unregister_governor(&watchdog_gov_notifier);
++}
++module_init(watchdog_gov_notifier_register);
++module_exit(watchdog_gov_notifier_unregister);
++
++MODULE_AUTHOR("Stefan Eichenberger <stefan@embear.ch>");
++MODULE_DESCRIPTION("Notifier watchdog pretimeout governor");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/watchdog/watchdog_pretimeout.h b/drivers/watchdog/watchdog_pretimeout.h
+index a3f1abc68839..bb00ca1fcadd 100644
+--- a/drivers/watchdog/watchdog_pretimeout.h
++++ b/drivers/watchdog/watchdog_pretimeout.h
+@@ -28,6 +28,8 @@ int watchdog_pretimeout_governor_set(struct watchdog_device *wdd,
+ #define WATCHDOG_PRETIMEOUT_DEFAULT_GOV		"noop"
+ #elif IS_ENABLED(CONFIG_WATCHDOG_PRETIMEOUT_DEFAULT_GOV_PANIC)
+ #define WATCHDOG_PRETIMEOUT_DEFAULT_GOV		"panic"
++#elif IS_ENABLED(CONFIG_WATCHDOG_PRETIMEOUT_DEFAULT_GOV_NOTIFIER)
++#define WATCHDOG_PRETIMEOUT_DEFAULT_GOV		"notifier"
+ #endif
+ 
+ #else
+-- 
+2.27.0
+
