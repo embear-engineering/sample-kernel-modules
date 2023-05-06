@@ -61,7 +61,7 @@
 	status = "disabled";
 };
 
-/* usdhc2 uses some pins from the leds group */
+/* usdhc1 uses some pins from the leds group */
 &usdhc1 {
 	status = "disabled";
 };
