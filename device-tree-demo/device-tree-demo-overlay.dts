@@ -1,0 +1,67 @@
+// A device tree overlay for the device-tree-demo. It adds a new node to the
+// device tree which is compatible to device-tree-demo-driver and has a
+// property called "demo-string" and a property demo-gpio" which is a phandle
+// to a GPIO node. This device tree is only compatible with imx6qm-apalis-eveal.dts
+
+#include <imx6q-pinfunc.h>
+
+/dts-v1/;
+/plugin/;
+
+&{/} {
+	demo {
+		compatible = "device-tree-demo";
+		demo-string = "Hello World";
+		demo-gpio = <&gpio1 14 0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_demo>;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_leds_ixora>;
+
+		led4-red {
+			gpios = <&gpio1 12 0>;
+			label = "LED_4_RED";
+		};
+
+		led5-green {
+			gpios = <&gpio2 1 0>;
+			label = "LED_5_GREEN";
+		};
+
+		led5-red {
+			gpios = <&gpio2 2 0>;
+			label = "LED_5_RED";
+		};
+	};
+};
+
+&iomuxc {
+	pinctrl_demo: demogrp {
+		fsl,pins = <
+			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x1b0b0
+		>;
+	};
+
+	pinctrl_leds_ixora: ledsixoragrp {
+		fsl,pins = <
+			MX6QDL_PAD_SD2_DAT3__GPIO1_IO12 0x1b0b0
+			MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
+			MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
+		>;
+	};
+};
+
+/* usdhc2 uses some pins from the leds group */
+&usdhc2 {
+	status = "disabled";
+};
+
+/* usdhc2 uses some pins from the leds group */
+&usdhc1 {
+	status = "disabled";
+};
