@@ -154,6 +154,7 @@ static int mipi_dsi_panel_prepare(struct drm_panel *panel)
 	int ret;
 
 	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
+
 	gpiod_set_value(dsi_panel->reset, 0);
 
 	ret = regulator_bulk_enable(dsi_panel->desc->num_supplies,
@@ -165,6 +166,11 @@ static int mipi_dsi_panel_prepare(struct drm_panel *panel)
 	gpiod_set_value(dsi_panel->reset, 1);
 	msleep(150);
 
+	dsi_panel->desc->init_sequence(dsi_panel->dsi);
+
+	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_EXIT_SLEEP_MODE, 0x00);
+	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
+
 	return 0;
 }
 
@@ -172,10 +178,7 @@ static int mipi_dsi_panel_enable(struct drm_panel *panel)
 {
 	struct mipi_dsi_panel *dsi_panel = panel_to_dsi_panel(panel);
 
-	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
-	dsi_panel->desc->init_sequence(dsi_panel->dsi);
 
-	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_EXIT_SLEEP_MODE, 0x00);
 	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_SET_DISPLAY_ON, 0x00);
 	backlight_enable(dsi_panel->backlight);
 
@@ -187,6 +190,7 @@ static int mipi_dsi_panel_disable(struct drm_panel *panel)
 	struct mipi_dsi_panel *dsi_panel = panel_to_dsi_panel(panel);
 
 	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
+
 	backlight_disable(dsi_panel->backlight);
 
 	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_SET_DISPLAY_OFF, 0x00);
@@ -204,9 +208,16 @@ static int mipi_dsi_panel_unprepare(struct drm_panel *panel)
 	struct mipi_dsi_panel *dsi_panel = panel_to_dsi_panel(panel);
 
 	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
+
+	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE, 0x00);
+
 	msleep(dsi_panel->sleep_delay);
 
+	gpiod_set_value(dsi_panel->reset, 0);
+
 	regulator_bulk_disable(dsi_panel->desc->num_supplies, dsi_panel->supplies);
+
+	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 
 	return 0;
 }
