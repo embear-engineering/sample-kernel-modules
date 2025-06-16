@@ -1,5 +1,7 @@
 obj-m += panel-mipi-dsi.o
 
+PWD := $(shell pwd)
+
 KDIR ?= "/lib/modules/$(shell uname -r)/build"
 
 all:

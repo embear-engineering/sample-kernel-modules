@@ -1,5 +1,7 @@
 obj-m += reset-reason.o
 
+PWD := $(shell pwd)
+
 KDIR ?= "/lib/modules/$(shell uname -r)/build"
 
 .PHONY = check
