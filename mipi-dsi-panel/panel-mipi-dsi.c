@@ -69,6 +69,10 @@ static void ts070wsh02ce_init_sequence(struct mipi_dsi_device *dsi)
 	MIPI_DSI_SEQ(dsi, 0x84, 0xA8);
 	MIPI_DSI_SEQ(dsi, 0x85, 0xE3);
 	MIPI_DSI_SEQ(dsi, 0x86, 0x88);
+
+
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_EXIT_SLEEP_MODE);
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_SET_DISPLAY_ON);
 }
 
 
@@ -84,6 +88,10 @@ static void wf70a8syahmngb_init_sequence(struct mipi_dsi_device *dsi)
 	MIPI_DSI_SEQ(dsi, 0x84, 0x88);
 	MIPI_DSI_SEQ(dsi, 0x85, 0x23);
 	MIPI_DSI_SEQ(dsi, 0x86, 0xB6);
+
+
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_EXIT_SLEEP_MODE);
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_SET_DISPLAY_ON);
 }
 
 static void wf40eswaa6_init_sequence(struct mipi_dsi_device *dsi)
@@ -149,7 +157,9 @@ static void wf40eswaa6_init_sequence(struct mipi_dsi_device *dsi)
 	msleep(5);
 
 	MIPI_DSI_SEQ(dsi, 0x36, 0x00);
-	MIPI_DSI_SEQ(dsi, 0x29);
+
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_EXIT_SLEEP_MODE);
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_SET_DISPLAY_ON);
 }
 
 static void am4001280a3tzqw01h_init_sequence(struct mipi_dsi_device *dsi)
@@ -211,7 +221,63 @@ static void am4001280a3tzqw01h_init_sequence(struct mipi_dsi_device *dsi)
 	MIPI_DSI_SEQ(dsi, 0x33,0x1C);
 	MIPI_DSI_SEQ(dsi, 0x34,0x40);
 
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_EXIT_SLEEP_MODE);
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_SET_DISPLAY_ON);
+
 	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
+}
+
+static void top055fhd01a_init_sequence(struct mipi_dsi_device *dsi)
+{
+	/**
+	 * Temporarly turn on tranmission of data during low power mode,
+	 * this is another way of achiving it. It could also be set in the
+	 * panel_desc->flags.
+	 */
+	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
+
+	MIPI_DSI_SEQ(dsi, 0xFE, 0x04);
+	MIPI_DSI_SEQ(dsi, 0x5E, 0x00);
+	MIPI_DSI_SEQ(dsi, 0x44, 0x47);
+	MIPI_DSI_SEQ(dsi, 0xFE, 0x07);
+	MIPI_DSI_SEQ(dsi, 0xA9, 0x6A);
+	MIPI_DSI_SEQ(dsi, 0xFE, 0x0A);
+	MIPI_DSI_SEQ(dsi, 0x14, 0x52);
+	MIPI_DSI_SEQ(dsi, 0xFE, 0x00);
+	MIPI_DSI_SEQ(dsi, 0x55, 0x00);
+
+	/* Set video mode to send vsync and hsync pulse */
+	MIPI_DSI_SEQ(dsi, 0xC2, 0x03);
+
+	MIPI_DSI_SEQ(dsi, 0x51, 0xFF);
+
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_EXIT_SLEEP_MODE);
+	msleep(500);
+	MIPI_DSI_SEQ(dsi, MIPI_DCS_SET_DISPLAY_ON);
+	msleep(100);
+	MIPI_DSI_SEQ(dsi, 0xFE, 0x07);
+	msleep(200);
+	MIPI_DSI_SEQ(dsi, 0xA9, 0xEA);
+	MIPI_DSI_SEQ(dsi, 0xFE, 0x00);
+
+	/* Read back all dsi registers we wrote above */
+#ifdef DEBUG
+	{
+		char buf[1];
+
+		mipi_dsi_dcs_read(dsi, 0x52, buf, 1);
+		pr_debug("%s - %s:%d: 0x52 = 0x%02x\n", __func__, __FILE__, __LINE__, buf[0]);
+		mipi_dsi_dcs_read(dsi, 0x54, buf, 1);
+		pr_debug("%s - %s:%d: 0x54 = 0x%02x\n", __func__, __FILE__, __LINE__, buf[0]);
+
+		char id[3];
+		mipi_dsi_dcs_read(dsi, 0x04, id, 3);
+		pr_debug("%s - %s:%d: ID = 0x%02x%02x%02x\n", __func__, __FILE__, __LINE__, id[0], id[1], id[2]);
+
+	}
+#endif /* DEBUG */
+
+	dsi->mode_flags &= MIPI_DSI_MODE_LPM;
 }
 
 static int mipi_dsi_panel_prepare(struct drm_panel *panel)
@@ -236,7 +302,6 @@ static int mipi_dsi_panel_prepare(struct drm_panel *panel)
 	if (!dsi_panel->wait_until_enabled) {
 		pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 		dsi_panel->desc->init_sequence(dsi_panel->dsi);
-		MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_EXIT_SLEEP_MODE, 0x00);
 		dsi_panel->prepared = true;
 	}
 
@@ -254,11 +319,9 @@ static int mipi_dsi_panel_enable(struct drm_panel *panel)
 	if (dsi_panel->wait_until_enabled) {
 		pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 		dsi_panel->desc->init_sequence(dsi_panel->dsi);
-		MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_EXIT_SLEEP_MODE, 0x00);
 		dsi_panel->prepared = true;
 	}
 
-	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_SET_DISPLAY_ON, 0x00);
 	backlight_enable(dsi_panel->backlight);
 
 	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
@@ -274,16 +337,15 @@ static int mipi_dsi_panel_disable(struct drm_panel *panel)
 
 	backlight_disable(dsi_panel->backlight);
 
-	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_SET_DISPLAY_OFF, 0x00);
-	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE, 0x00);
+	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_SET_DISPLAY_OFF);
+	MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE);
 
 	msleep(dsi_panel->sleep_delay);
 
-	gpiod_set_value(dsi_panel->reset, 0);
 
 	if (dsi_panel->wait_until_enabled) {
 		pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
-		MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE, 0x00);
+		MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE);
 		msleep(dsi_panel->sleep_delay);
 	}
 
@@ -301,7 +363,7 @@ static int mipi_dsi_panel_unprepare(struct drm_panel *panel)
 	dsi_panel->prepared = false;
 	if (!dsi_panel->wait_until_enabled) {
 		pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
-		MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE, 0x00);
+		MIPI_DSI_SEQ(dsi_panel->dsi, MIPI_DCS_ENTER_SLEEP_MODE);
 		msleep(dsi_panel->sleep_delay);
 	}
 
@@ -428,6 +490,26 @@ static const struct drm_display_mode am4001280a3tzqw01h_mode = {
 	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
+static const struct drm_display_mode top055fhd01a_mode = {
+	/* The adapter is not able to handle higher pixel clocks */
+	.clock		= 70000,
+
+	.hdisplay	= 1080,
+	.hsync_start	= 1080 + 35,
+	.hsync_end	= 1080 + 35 + 10,
+	.htotal		= 1080 + 35 + 10 + 20,
+
+	.vdisplay	= 1920,
+	.vsync_start	= 1920 + 12,
+	.vsync_end	= 1920 + 12 + 5,
+	.vtotal		= 1920 + 12 + 5 + 7,
+
+	.width_mm	= 70,
+	.height_mm	= 127,
+
+	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
+};
 
 static const char * const ts8550b_supply_names[] = {
 	"VCC",
@@ -484,6 +566,18 @@ static const struct mipi_dsi_panel_panel_desc am4001280a3tzqw01h_desc= {
 	.panel_has_backlight = true
 };
 
+static const struct mipi_dsi_panel_panel_desc top055fhd01a_desc= {
+	.mode = &top055fhd01a_mode,
+	.lanes = 4,
+	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE,
+	.format = MIPI_DSI_FMT_RGB888,
+	.supply_names = ts8550b_supply_names,
+	.num_supplies = ARRAY_SIZE(ts8550b_supply_names),
+	.panel_sleep_delay = 200,
+	.init_sequence = top055fhd01a_init_sequence,
+	.panel_has_backlight = false
+};
+
 static int mipi_dsi_bl_get_brightness(struct backlight_device *bl)
 {
 	struct mipi_dsi_device *dsi = bl_get_data(bl);
@@ -523,7 +617,6 @@ static const struct backlight_ops mipi_dsi_bl_ops = {
 	.update_status = mipi_dsi_bl_update_status,
 	.get_brightness = mipi_dsi_bl_get_brightness,
 };
-
 
 static int mipi_dsi_panel_probe(struct mipi_dsi_device *dsi)
 {
@@ -583,6 +676,7 @@ static int mipi_dsi_panel_probe(struct mipi_dsi_device *dsi)
 	dsi_panel->sleep_delay = desc->panel_sleep_delay;
 
 	if (desc->panel_has_backlight) {
+		pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 		memset(&dsi_panel->bl_props, 0, sizeof(dsi_panel->bl_props));
 		dsi_panel->bl_props.type = BACKLIGHT_RAW;
 		dsi_panel->bl_props.brightness = 255;
@@ -597,11 +691,14 @@ static int mipi_dsi_panel_probe(struct mipi_dsi_device *dsi)
 			return ret;
 		}
 
+		pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 	}
 
+	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 	dsi_panel->wait_until_enabled = of_property_read_bool(dsi->dev.of_node,
 							"wait-until-enabled");
 
+	pr_debug("%s - %s:%d\n", __func__, __FILE__, __LINE__);
 	return mipi_dsi_attach(dsi);
 }
 
@@ -618,6 +715,7 @@ static const struct of_device_id mipi_dsi_panel_of_match[] = {
 	{ .compatible = "winstar,wf70a8syahmngb", .data = &wf70a8syahmngb_desc},
 	{ .compatible = "tdo,ts070wsh02ce", .data = &ts070wsh02ce_desc},
 	{ .compatible = "ampire,am4001280a3tzqw01h", .data = &am4001280a3tzqw01h_desc},
+	{ .compatible = "wisecoco,top055fhd01a", .data = &top055fhd01a_desc},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mipi_dsi_panel_of_match);
